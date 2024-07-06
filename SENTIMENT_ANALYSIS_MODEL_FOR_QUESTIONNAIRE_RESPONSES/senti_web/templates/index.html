@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sentiment Analysis Web App</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+    <link href="static/style.css" rel="stylesheet"> <!-- Link to external CSS file -->
+</head>
+<body>
+    <div class="container">
+        <div class="logo-container">
+            <img src="static/logo.png" alt="Logo">
+            <div>
+                <h5>คณะวิทยาศาสตร์และเทคโนโลยี</h5>
+                <h4>มหาวิทยาลัยราชภัฏเชียงใหม่</h4>
+            </div>
+        </div>
+        <div class="row mt-4">
+            <div class="col">
+                <h2 class="research-title">การพัฒนาตัวแบบวิเคราะห์ความรู้สึกของข้อความจากการตอบแบบสอบถาม<br>ภาควิชาคอมพิวเตอร์ มหาวิทยาลัยราชภัฏเชียงใหม่</h2>
+            </div>
+        </div>
+        
+        <!-- Predict Form -->
+        <div class="row mt-4">
+            <div class="col">
+                <form id="predict-form" class="form-inline justify-content-center">
+                    <input type="text" name="sentence" id="sentence-input" class="form-control mr-2" placeholder="Enter a sentence">
+                    <button type="button" class="btn btn-primary" onclick="predictSentence()">Predict</button>
+                </form>
+                <div id="prediction-result" class="text-center mt-3"></div>
+            </div>
+        </div>
+
+        <!-- Upload Form -->
+        <div class="row mt-4">
+            <div class="col">
+                <form id="upload-form" enctype="multipart/form-data" class="form-inline justify-content-center">
+                    <input type="file" name="file" id="file-input" class="form-control-file">
+                    <button type="button" class="btn btn-secondary" onclick="uploadFile()">Upload</button>
+                </form>
+            </div>
+        </div>
+        
+        <div class="row mt-4 table-slider-container">
+            <div class="table-container">
+                <div id="table-container"></div>
+                <div class="download-btn-container">
+                    <button id="download-button" class="btn btn-success" onclick="downloadFile()" style="display:none;">Download</button>
+                </div>
+            </div>
+            <div class="slider-container">
+                <div id="slider-container" style="display:none;">
+                    <div id="slider">
+                        <div id="slider-bar"></div>
+                        <div id="slider-circle"></div>
+                        <div id="arrow-label"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mt-4">
+            <div class="col text-center">
+                <div id="error-message" class="text-danger"></div>
+            </div>
+        </div>
+    </div>
+    <!-- Bootstrap JS and dependencies -->
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.4/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+    <script>
+        function uploadFile() {
+            let formData = new FormData(document.getElementById('upload-form'));
+            fetch('/upload', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    document.getElementById('error-message').innerText = data.error;
+                } else {
+                    document.getElementById('table-container').innerHTML = data.table;
+                    document.getElementById('slider-container').style.display = 'block';
+                    document.getElementById('download-button').style.display = 'block';
+                    document.getElementById('error-message').innerText = '';
+                    attachRowClickHandlers();
+                }
+            });
+        }
+
+        function attachRowClickHandlers() {
+            let rows = document.querySelectorAll('table tbody tr');
+            rows.forEach(row => {
+                row.addEventListener('click', function() {
+                    let probability = this.cells[2].innerText;  // Use the third column (probability)
+                    let prediction = this.cells[1].innerText === '0' ? 'Positive' : 'Negative';
+                    updateSlider(probability, prediction);
+                });
+            });
+        }
+
+        function updateSlider(probability, predictionLabel) {
+            let sliderCircle = document.getElementById('slider-circle');
+            let arrowLabel = document.getElementById('arrow-label');
+            let probValue = parseFloat(probability);
+            let topValue = predictionLabel === 'Negative' ? probValue * 100 : (100 - (probValue * 100));
+            sliderCircle.style.top = topValue + '%';
+            arrowLabel.style.top = topValue + '%';
+            arrowLabel.innerHTML = `[${predictionLabel} | ${probValue.toFixed(2)}]`;
+        }
+
+        function downloadFile() {
+            window.location.href = '/download';
+        }
+
+        function predictSentence() {
+            let sentence = document.getElementById('sentence-input').value;
+            console.log(`Sending sentence for prediction: ${sentence}`);
+            fetch('/predict', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ sentence: sentence })
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('Received prediction response:', data);
+                if (data.error) {
+                    document.getElementById('error-message').innerText = data.error;
+                } else {
+                    let prediction = data.prediction === 0 ? 'Positive' : 'Negative';
+                    let probability = data.probability;
+                    document.getElementById('prediction-result').innerHTML = `
+                        <p>Prediction: ${prediction}</p>
+                        <p>Probability: ${probability.toFixed(2)}</p>
+                    `;
+                    updateSlider(probability, prediction);
+                }
+            });
+        }
+    </script>
+</body>
+</html>
